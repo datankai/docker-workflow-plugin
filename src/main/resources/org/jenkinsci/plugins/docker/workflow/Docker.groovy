@@ -111,7 +111,7 @@ class Docker implements Serializable {
         public String imageName() {
             return toQualifiedImageName(id)
         }
-        
+
         public <V> V inside(String args = '', Closure<V> body) {
             docker.node {
                 def toRun = imageName()
@@ -156,16 +156,19 @@ class Docker implements Serializable {
             }
         }
 
-        public void tag(String tagName = parsedId.tag, boolean force = true) {
+        public void tag(String tagName = parsedId.tag, boolean force = false) {
             docker.node {
                 def taggedImageName = toQualifiedImageName(parsedId.userAndRepo + ':' + tagName)
                 // TODO as of 1.10.0 --force is deprecated; for 1.12+ do not try it even once
-                docker.script.sh "docker tag --force=${force} ${id} ${taggedImageName} || docker tag ${id} ${taggedImageName}"
+                // JENKINS-41148: let the client select which behavior to use instead of miserably fail and retry
+                def tagCommand = force ? "docker tag --force=${force} ${id} ${taggedImageName}" : "docker tag ${id} ${taggedImageName}"
+                docker.script.sh tagCommand
                 return taggedImageName;
             }
         }
 
-        public void push(String tagName = parsedId.tag, boolean force = true) {
+        // JENKINS-41148: default force to false as it is a deprecated option in Docker
+        public void push(String tagName = parsedId.tag, boolean force = false) {
             docker.node {
                 // The image may have already been tagged, so the tagging may be a no-op.
                 // That's ok since tagging is cheap.
